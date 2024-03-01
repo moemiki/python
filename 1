@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 from tiling_logic import save_configuration, load_configuration
+from movement_logic import calculate_steps, generate_movement_command
 
 import os
 
@@ -188,10 +189,6 @@ toggle_switch.grid(row=len(increments)+1, column=0)  # Place below the radio but
 movement_frame = tk.Frame(right_side)
 movement_frame.grid(row=3, column=0, sticky="nsew", padx=10, pady=10)
 
-# Function for button actions (you'll need to fill this in)
-def on_movement_button_click(direction):
-    pass# ... Implement movement logic based on 'direction'
-
 # Movement Buttons with increased size and optional style
 button_style = ttk.Style()  # Optional: Create style for movement buttons
 button_style.configure('movement.TButton', font=('Arial', 14, 'bold'))  # Example style
@@ -202,6 +199,11 @@ tk.Button(movement_frame, text="Down", command=lambda: on_movement_button_click(
 tk.Button(movement_frame, text="Left", command=lambda: on_movement_button_click("Left"), width=10, height=2).grid(row=1, column=0)
 tk.Button(movement_frame, text="Right", command=lambda: on_movement_button_click("Right"), width=10, height=2).grid(row=1, column=2)
 
+# Function for button actions (you'll need to fill this in)
+def on_movement_button_click(direction, distance):
+    steps = calculate_steps(distance) 
+    command = generate_movement_command(direction, steps) 
+    send_command(command)
 
 #BOTTOM
 
@@ -212,6 +214,34 @@ bottom_side.grid_columnconfigure(0, weight=1)
 
 tk.Label(bottom_side, text="Bottom Side", font=("Arial", 12, "bold")).grid(row=0, column=0, sticky="nsew")
 
+bottom_frame = tk.Frame(window)
+bottom_frame.grid(row=1, column=2, sticky="nsew") 
+
+bottom_frame = tk.Frame(window)
+bottom_frame.grid(row=1, column=2, sticky="nsew") 
+
+# X-Distance Entry
+tk.Label(bottom_frame, text="X-Distance (mm):").pack()
+x_distance_input = tk.Entry(bottom_frame) 
+x_distance_input.pack() 
+
+# Y-Distance Entry
+tk.Label(bottom_frame, text="Y-Distance (mm):").pack()
+y_distance_input = tk.Entry(bottom_frame) 
+y_distance_input.pack() 
+
+# Modify the get_distance_from_entry function
+def get_distance_from_entry():
+    try:
+        x_distance = float(x_distance_input.get())
+        y_distance = float(y_distance_input.get())
+        return x_distance, y_distance 
+    except ValueError:
+        # Handle invalid input
+        return 0.0, 0.0
+def on_up_button_click():
+    x_distance, y_distance = get_distance_from_entry() 
+    on_movement_button_click("U", y_distance)  # Assuming 'Up' is for Y-axis 
 
 
 
