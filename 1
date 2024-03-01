@@ -1,0 +1,218 @@
+import tkinter as tk
+from tkinter import ttk
+from tiling_logic import save_configuration, load_configuration
+
+import os
+
+import arduino_communication 
+
+arduino_port = 'COM6'
+baud_rate = 9600
+
+if not arduino_communication.setup_serial(arduino_port, baud_rate):
+    print("Unable to connect. Check Arduino and port settings.")
+
+window = tk.Tk()
+window.title("Laser Engraver GUI")
+#window.geometry("1024x768")
+print(os.getcwd()) 
+
+#LEFT SIDE
+left_side = tk.Frame(window)
+left_side.grid(row=0, column=0, sticky="nsew")
+left_side.grid_rowconfigure(1, weight=1)
+left_side.grid_columnconfigure(0, weight=1)
+
+# Title (centered)
+tk.Label(left_side, text="Left Side", font=("Arial", 12, "bold"), justify="center").grid(row=0, column=0, columnspan=2)
+
+#Input Frame
+input_frame = tk.Frame(left_side)
+input_frame.grid(row=1, column=0, columnspan=2)
+
+# Function to group input field creation
+def create_input_field(label_text, row, column):
+  tk.Label(input_frame, text=label_text).grid(row=row, column=0, pady=10)
+  entry = tk.Entry(input_frame)  # Entry in 'input_frame'
+  entry.grid(row=row, column=1, padx=10, pady=10)
+  return entry
+
+# Create input fields using the function
+entry1_x = create_input_field("Tile Width (mm):", 0, 1) 
+entry2_y = create_input_field("Tile Height (mm):", 1, 1)
+overlap_input = create_input_field("Overlap (mm):", 2, 1)
+image_input = create_input_field("Image Filename:", 3, 1)
+
+#Memory selection items
+selected_slot = None
+slot_buttons = []
+
+def on_save_configuration():
+    try:
+        tile_width = float(entry1_x.get())
+        tile_height = float(entry2_y.get())
+        overlap = float(overlap_input.get()) 
+        image_filename = image_input.get() 
+        slot_number = selected_slot 
+        if selected_slot is None:
+            print("Please select a slot!")
+            return
+        save_configuration(slot_number, tile_width, tile_height, overlap, image_filename)
+        print("Configuration saved successfully!")
+    except ValueError:
+        print("Invalid input. Please enter numerical values.")
+def on_load_configuration():
+    if selected_slot is None:
+        print("Please select a slot!")  
+        return
+
+    tile_width, tile_height, overlap, image_filename = load_configuration(selected_slot)
+
+    if None in (tile_width, tile_height, overlap, image_filename):
+        print("No configuration data found for this slot.")
+    else:
+        entry1_x.delete(0, tk.END) 
+        entry1_x.insert(0, tile_width)
+        entry2_y.delete(0, tk.END)
+        entry2_y.insert(0, tile_height)
+        overlap_input.delete(0, tk.END)
+        overlap_input.insert(0, overlap)
+        image_input.delete(0, tk.END)
+        image_input.insert(0, image_filename)
+        print("Configuration loaded successfully!")
+def on_slot_button_clicked(slot_number):
+    global selected_slot
+    selected_slot = slot_number
+    # Visual feedback:
+    for button in slot_buttons:
+        button.configure(bg="SystemButtonFace")
+    slot_buttons[slot_number - 1].configure(bg="lightblue")  # Highlight selected (zero-based indexing)
+
+# Frame for Memory Buttons
+memory_button_frame = tk.Frame(left_side)
+memory_button_frame.grid(row=5, column=0, columnspan=2)  # Adjust row as needed
+
+# Create slot buttons
+for i in range(1, 9):
+    row = (i - 1) // 2  # Integer division for 2 rows
+    col = (i - 1) % 2  # Modulo for 2 columns
+    button = tk.Button(memory_button_frame, text=f"Slot {i}", command=lambda i=i: on_slot_button_clicked(i))
+    button.grid(row=row, column=col, padx=5, pady=5)
+    slot_buttons.append(button)
+
+#SaveLoad Frame
+saveload_frame = tk.Frame(left_side)
+saveload_frame.grid(row=6,column=0)
+
+# Save and load buttons
+save_button = tk.Button(saveload_frame, text="Save Configuration", command=on_save_configuration, bg="SystemButtonFace")
+save_button.grid(row=0, column=0, padx=5)
+
+load_button = tk.Button(saveload_frame, text="Load Configuration", command=on_load_configuration, bg="SystemButtonFace")
+load_button.grid(row=0, column=1, padx=5)
+
+# CENTER
+center_area = tk.Frame(window)
+center_area.grid(row=0, column=1, sticky="nsew")
+
+center_area.grid_rowconfigure(1, weight=1)  # Make center row expand
+center_area.grid_columnconfigure(0, weight=1)  # Make center column expand
+
+# "Center" title label
+tk.Label(center_area, text="Center", font=("Arial", 12, "bold")).grid(row=0, column=0, sticky="nsew")
+
+# Work area canvas
+work_area_canvas = tk.Canvas(center_area, width=400, height=300, bg="lightgray") 
+work_area_canvas.grid(row=2, column=0, sticky="nsew") 
+
+#RIGHT SIDE
+
+right_side = tk.Frame(window)
+right_side.grid(row=0, column=2, sticky="nsew")
+right_side.grid_rowconfigure(1, weight=1)
+right_side.grid_columnconfigure(0, weight=1)
+
+tk.Label(right_side, text="Right Side", font=("Arial", 12, "bold")).grid(row=0, column=0, sticky="nsew")
+
+# Control Frame
+control_frame = tk.Frame(right_side)
+control_frame.grid(row=1, column=0, sticky="nsew") # Place the control frame below the "Right Side" label
+
+def on_acceleration_slider_change(value):
+    acceleration_value = int(value)
+    arduino_communication.send_data('a', acceleration_value)  # Assuming 'a' is the command for acceleration
+
+# Acceleration Slider
+acceleration_slider = tk.Scale(control_frame, from_=0, to=100, orient=tk.HORIZONTAL, label="Acceleration")
+acceleration_slider.grid(row=0, column=0)
+
+def on_motor_speed_change(value):
+    speed_value = int(value) 
+    arduino_communication.send_data('s', speed_value)      # Assuming 's' is the command for speed
+
+# Motor Speed Slider
+motor_speed_slider = tk.Scale(control_frame, from_=0, to=100, orient=tk.HORIZONTAL, label="Motor Speed")
+motor_speed_slider.grid(row=0, column=1)  # Place next to acceleration slider
+
+# Jog Mode Frame
+jog_mode_frame = tk.Frame(right_side) 
+jog_mode_frame.grid(row=2, column=0, sticky="nsew")  # Place in the right_side section
+jog_mode_frame.focus_set()  # Allow it to receive input focus
+
+# Movement increment choices
+increments = [10, 1, 0.1, 0.01, 0.001]  
+mm_step_size = tk.DoubleVar(value=increments[0])
+
+# State variable for the toggle
+is_visible = tk.BooleanVar(value=True)  # Start with the buttons visible
+
+# Function to toggle the visibility of radio buttons
+def toggle_radio_buttons():
+    for child in jog_mode_frame.winfo_children():
+        if child.winfo_class() == 'Radiobutton':
+            if is_visible.get():
+                child.grid(row=increments.index(float(child["text"]))+1, column=0)  # Use the index of the increment as the row 
+            else:
+                child.grid_remove()
+
+# Radio Buttons - We'll initially create them (visible) as before
+tk.Label(jog_mode_frame, text="Step Size (mm):").grid(row=0, column=0)
+for i, increment in enumerate(increments):
+    tk.Radiobutton(jog_mode_frame, text=str(increment), variable=mm_step_size, value=increment).grid(row=i+1, column=0) 
+
+# Toggle Switch 
+toggle_switch = tk.Checkbutton(jog_mode_frame, text="Show Step Sizes", variable=is_visible, onvalue=True, offvalue=False, command=toggle_radio_buttons)
+toggle_switch.grid(row=len(increments)+1, column=0)  # Place below the radio buttons
+
+# Movement Frame
+movement_frame = tk.Frame(right_side)
+movement_frame.grid(row=3, column=0, sticky="nsew", padx=10, pady=10)
+
+# Function for button actions (you'll need to fill this in)
+def on_movement_button_click(direction):
+    pass# ... Implement movement logic based on 'direction'
+
+# Movement Buttons with increased size and optional style
+button_style = ttk.Style()  # Optional: Create style for movement buttons
+button_style.configure('movement.TButton', font=('Arial', 14, 'bold'))  # Example style
+
+# Movement Buttons with layout adjustments
+tk.Button(movement_frame, text="Up", command=lambda: on_movement_button_click("Up"), width=10, height=2).grid(row=0, column=1)
+tk.Button(movement_frame, text="Down", command=lambda: on_movement_button_click("Down"), width=10, height=2).grid(row=2, column=1)
+tk.Button(movement_frame, text="Left", command=lambda: on_movement_button_click("Left"), width=10, height=2).grid(row=1, column=0)
+tk.Button(movement_frame, text="Right", command=lambda: on_movement_button_click("Right"), width=10, height=2).grid(row=1, column=2)
+
+
+#BOTTOM
+
+bottom_side = tk.Frame(window)
+bottom_side.grid(row=1, column=1, sticky="nsew")
+bottom_side.grid_rowconfigure(1, weight=1)
+bottom_side.grid_columnconfigure(0, weight=1)
+
+tk.Label(bottom_side, text="Bottom Side", font=("Arial", 12, "bold")).grid(row=0, column=0, sticky="nsew")
+
+
+
+
+window.mainloop()
